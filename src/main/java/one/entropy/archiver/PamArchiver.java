@@ -13,6 +13,8 @@ import javax.ejb.Startup;
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
 import javax.jms.ConnectionFactory;
+import java.math.BigInteger;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -27,6 +29,7 @@ import static org.kie.camel.KieCamelUtils.asCamelKieName;
 public class PamArchiver extends RouteBuilder {
 
     private static final String IDS_HEADER = "PAM_IDs";
+    private static final String DAYS_HEADER = "days_limit";
 
     @Resource(mappedName = "java:jboss/DefaultJMSConnectionFactory")
     private ConnectionFactory connectionFactory;
@@ -57,6 +60,7 @@ public class PamArchiver extends RouteBuilder {
                 .toD("kie:http://{{login}}@localhost:8080/kie-server/services/rest/server");
 
         from("direct:process-archiver")
+                .process(this::setDaysLimit)
                 .to("sql:{{processes.select}}?dataSource=#mainDS")
                 .process(exchange -> cacheIDsToArchive(exchange, "id"))
                 .log("Processes to archive: ${header.CamelSqlRowCount}")
@@ -64,6 +68,7 @@ public class PamArchiver extends RouteBuilder {
                 .log("Processes archived: ${header.CamelSqlUpdateCount}")
                 .process(this::setIDsToDelete)
                 .to("sql:{{processes.delete}}?batch=true&dataSource=#mainDS")
+                .setHeader("Processes archived:", simple("${header.CamelSqlUpdateCount}"))
                 .log("Processes deleted: ${header.CamelSqlUpdateCount}");
 
         from("direct:node-archiver")
@@ -74,6 +79,7 @@ public class PamArchiver extends RouteBuilder {
                 .log("Nodes archived: ${header.CamelSqlUpdateCount}")
                 .process(this::setIDsToDelete)
                 .to("sql:{{node.delete}}?batch=true&dataSource=#mainDS")
+                .setHeader("Nodes archived:", simple("${header.CamelSqlUpdateCount}"))
                 .log("Nodes deleted: ${header.CamelSqlUpdateCount}");
 
         from("direct:variable-archiver")
@@ -84,13 +90,23 @@ public class PamArchiver extends RouteBuilder {
                 .log("Variables archived: ${header.CamelSqlUpdateCount}")
                 .process(this::setIDsToDelete)
                 .to("sql:{{variable.delete}}?batch=true&dataSource=#mainDS")
-                .log("Nodes deleted: ${header.CamelSqlUpdateCount}");
+                .setHeader("Variables archived:", simple("${header.CamelSqlUpdateCount}"))
+                .log("Variables deleted: ${header.CamelSqlUpdateCount}");
+    }
+
+    private void setDaysLimit(Exchange exchange) {
+        byte[] bytes = exchange.getIn().getBody(byte[].class);
+        int days = new BigInteger(bytes).intValue();
+        Map<String, Object> parameters = new HashMap<>(1);
+        parameters.put(DAYS_HEADER, days);
+        exchange.getIn().setBody(parameters);
     }
 
     private void cacheIDsToArchive(Exchange exchange, String column) {
         List<Map<String, Object>> rows = exchange.getIn().getBody(List.class);
         List<Long> ids = rows.stream().map(map -> (Long) map.get(column)).collect(Collectors.toList());
         exchange.getIn().setHeader(IDS_HEADER, ids);
+        log.info("IDs to archive: {}", ids);
     }
 
     private void setIDsToDelete(Exchange exchange) {
@@ -105,7 +121,13 @@ public class PamArchiver extends RouteBuilder {
         headers.put(asCamelKieName("containerId"), headers.get("KIE_DeploymentId"));
         headers.put(asCamelKieName("processInstanceId"), headers.get("KIE_ProcessInstanceId"));
         headers.put(asCamelKieName("signalName"), "archiver-response");
-        headers.put(asCamelKieName("event"), "empty");
+
+        String response = headers.entrySet().stream()
+                .filter(e -> e.getKey().contains("archived:"))
+                .map(e -> e.getKey().concat(e.getValue().toString()))
+                .collect(Collectors.joining("\n"));
+
+        headers.put(asCamelKieName("event"), response);
         exchange.getIn().setHeaders(headers);
     }
 }
