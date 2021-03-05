@@ -45,6 +45,7 @@ Archive routes implemented in [PamArchiver](src/main/java/one/entropy/archiver/P
 6. Send signal with result to initial process through kie-camel component   
 
 ## How to prepare demo
+Prerequisites: Java 8 and Maven 3.6 installed. 
 
 1. Install Jboss EAP 7.3
 2. Configure Jboss EAP 7.3
