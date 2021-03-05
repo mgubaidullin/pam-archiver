@@ -1,5 +1,12 @@
 # PAM-Archiver
 
+![Build](https://img.shields.io/badge/Build_with-Java8-orange.svg?style=for-the-badge&logo=java)
+![EAP](https://img.shields.io/badge/-Jboss_EAP_7.3-orange.svg?style=for-the-badge)
+![RHPAM](https://img.shields.io/badge/-RHPAM_7.8-orange.svg?style=for-the-badge)
+![Fuse](https://img.shields.io/badge/-Fuse_7.8-orange.svg?style=for-the-badge)
+![Postgres](https://img.shields.io/badge/-PostgreSQL-orange.svg?style=for-the-badge)
+![License](https://img.shields.io/badge/License-Apache-green.svg?style=for-the-badge&logo=apache)
+
 Prototype of RHPAM process log archiving solution. 
 
 ## Architecture
